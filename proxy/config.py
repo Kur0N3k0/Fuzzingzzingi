@@ -79,5 +79,5 @@ db_config = {
     'host': '13.209.63.65',
     'user': 'zzingzzingi',
     'password': '!Ru7eP@ssw0rD!12',
-    'database': 'requests'
+    'database': 'Fuzzingzzingi'
 }
