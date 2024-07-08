@@ -76,8 +76,8 @@ args = parse_arguments()
 
 # 데이터베이스 설정 추가
 db_config = {
-    'host': '13.209.63.65',
-    'user': 'zzingzzingi',
+    'host': 'localhost',
+    'user': 'root',
     'password': '!Ru7eP@ssw0rD!12',
-    'database': 'Fuzzingzzingi'
+    'database': 'requests'
 }
