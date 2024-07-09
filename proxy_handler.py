@@ -10,7 +10,7 @@ import zlib
 import os
 import time
 import json
-# import mysql.connector
+import mysql.connector
 import http.cookies
 import brotli
 
@@ -159,7 +159,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         req = self
         content_length = int(req.headers.get("Content-Length", 0))
-        print(content_length)
         req_body = self.rfile.read(content_length) if content_length else b""
 
         if req.path[0] == "/":
@@ -230,7 +229,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return
             if res_body_modified is not None:
                 res_body = self.encode_content_body(res_body_modified, content_encoding)
-                # res.headers["Content-Length"] = str(len(res_body))
                 del res.headers["Content-Encoding"]
 
         res.headers["Content-Length"] = str(len(res_body))
@@ -248,7 +246,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             res_body_plain = self.decode_content_body(res_body, content_encoding)
             with self.lock:
                 save_handler(req, req_body, res, res_body_plain)
-                # self.save_to_database(req, req_body, res, res_body_plain)
+                self.save_to_database(req, req_body, res, res_body_plain)
 
     do_HEAD = do_POST = do_PUT = do_DELETE = do_OPTIONS = do_GET
 
@@ -300,8 +298,6 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 text = zlib.decompress(data, -zlib.MAX_WBITS)
         elif encoding == "br":
             text = brotli.decompress(data)
-            print("+++++++++++++++++++++++++++++++++++++++ Hi +++++++++++++++++++++++++++++++++++++++++")
-            print(text[:10])
         else:
             raise Exception("Unknown Content-Encoding: %s" % encoding)
         return text
