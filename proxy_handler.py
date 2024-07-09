@@ -10,8 +10,10 @@ import zlib
 import os
 import time
 import json
-import mysql.connector
+# import mysql.connector
 import http.cookies
+import brotli
+
 from subprocess import Popen, PIPE
 from http.server import BaseHTTPRequestHandler
 from http.client import HTTPMessage
@@ -112,24 +114,25 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
         context.load_cert_chain(certpath, args.cert_key)
         try:
             self.connection = context.wrap_socket(self.connection, server_side=True)
-        except ssl.SSLEOFError:
+        except ssl.SSLEOFError: 
             print("Handshake refused by client, maybe SSL pinning?")
             return
         self.rfile = self.connection.makefile("rb", self.rbufsize)
         self.wfile = self.connection.makefile("wb", self.wbufsize)
 
         conntype = self.headers.get("Proxy-Connection", "")
-        if self.protocol_version == "HTTP/1.1" and conntype.lower() != "close":
-            self.close_connection = False
-        else:
-            self.close_connection = True
+        # if self.protocol_version == "HTTP/1.1" and conntype.lower() != "close":
+        #     self.close_connection = False
+        # else:
+        #     self.close_connection = True
 
     def connect_relay(self):
         address = self.path.split(":", 1)
         address = (address[0], int(address[1]) or 443)
         try:
             s = socket.create_connection(address, timeout=self.timeout)
-        except Exception:
+        except Exception as e:
+            print(e)
             self.send_error(502)
             return
         self.send_response(200, "Connection Established")
@@ -156,6 +159,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
 
         req = self
         content_length = int(req.headers.get("Content-Length", 0))
+        print(content_length)
         req_body = self.rfile.read(content_length) if content_length else b""
 
         if req.path[0] == "/":
@@ -207,7 +211,11 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return
 
             res_body = res.read()
-        except Exception:
+        except http.client.IncompleteRead as e:
+            res_body = e.partial
+            print(res_body[:10])
+        except Exception as e:
+            print(e)
             if origin in self.tls.conns:
                 del self.tls.conns[origin]
             self.send_error(502)
@@ -222,8 +230,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 return
             if res_body_modified is not None:
                 res_body = self.encode_content_body(res_body_modified, content_encoding)
-                res.headers["Content-Length"] = str(len(res_body))
+                # res.headers["Content-Length"] = str(len(res_body))
+                del res.headers["Content-Encoding"]
 
+        res.headers["Content-Length"] = str(len(res_body))
         res.headers = self.filter_headers(res.headers)
 
         self.send_response_only(res.status, res.reason)
@@ -238,7 +248,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             res_body_plain = self.decode_content_body(res_body, content_encoding)
             with self.lock:
                 save_handler(req, req_body, res, res_body_plain)
-                self.save_to_database(req, req_body, res, res_body_plain)
+                # self.save_to_database(req, req_body, res, res_body_plain)
 
     do_HEAD = do_POST = do_PUT = do_DELETE = do_OPTIONS = do_GET
 
@@ -261,7 +271,7 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
             filtered_encodings = [
                 x
                 for x in re.split(r",\s*", ae)
-                if x in ("identity", "gzip", "x-gzip", "deflate")
+                if x in ("identity", "gzip", "x-gzip", "deflate", "br")
             ]
             headers["Accept-Encoding"] = ", ".join(filtered_encodings)
 
@@ -288,6 +298,10 @@ class ProxyRequestHandler(BaseHTTPRequestHandler):
                 text = zlib.decompress(data)
             except zlib.error:
                 text = zlib.decompress(data, -zlib.MAX_WBITS)
+        elif encoding == "br":
+            text = brotli.decompress(data)
+            print("+++++++++++++++++++++++++++++++++++++++ Hi +++++++++++++++++++++++++++++++++++++++++")
+            print(text[:10])
         else:
             raise Exception("Unknown Content-Encoding: %s" % encoding)
         return text
